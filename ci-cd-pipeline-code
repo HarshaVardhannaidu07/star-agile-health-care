@@ -1,0 +1,69 @@
+pipeline{
+
+ agent { label 'built-in' }
+ 
+ environment {
+  IMAGE_NAME = "cloudthree372/medicure-app"
+  TAG = "${BUILD_NUMBER}"
+ }
+
+ tools{
+    maven 'Maven'
+ }
+stages{
+    stage('Checkout code')
+    {
+        agent any
+        steps{
+            git 'https://github.com/HarshaVardhannaidu07/star-agile-health-care'
+        }
+    }
+        
+        stage('Package code')
+        {
+            agent any
+            steps{
+                sh 'mvn clean package'
+            }
+        }
+        
+        stage('Build Image')
+        {
+            agent any
+            steps{
+                sh 'docker build -t $IMAGE_NAME:$TAG .'
+            }
+        }
+    
+     stage('Docker Push') {
+   steps {
+    withCredentials([usernamePassword(
+      credentialsId: 'docker-creds',
+      usernameVariable: 'USER',
+      passwordVariable: 'PASS'
+    )]) {
+     sh 'echo $PASS | docker login -u $USER --password-stdin'
+     sh 'docker push $IMAGE_NAME:$TAG'
+    }
+   }
+  }
+  stage('Deploy on Test server')
+        {
+            agent {
+                label 'test-server'
+                
+            }
+            steps{
+                sh 'docker run -d -p 8088:8082 $IMAGE_NAME:$TAG '
+            }
+        }
+  stage('Application Health Check') {
+    steps {
+        sh 'curl -f --retry 10 --retry-delay 10 http://3.107.20.190:8088'
+    }
+}
+        
+      
+ }
+    
+}
